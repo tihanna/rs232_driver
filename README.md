@@ -1,3 +1,4 @@
 RS232 Driver implementation
+===========================
 
-Example linux kernel module
+Example Linux kernel module
