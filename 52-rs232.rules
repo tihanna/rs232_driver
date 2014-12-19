@@ -1,3 +1,0 @@
-ACTION=="add", DEVPATH=="/module/rs232_mod" SUBSYSTEM=="module" RUN="/home/tijana/Documents/rs232_driver/create_node.sh"
- 
-ACTION=="remove", DEVPATH=="/module/rs232_mod" SUBSYSTEM=="module" RUN="/home/tijana/Documents/rs232_driver/remove_node.sh"
