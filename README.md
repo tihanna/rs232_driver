@@ -12,7 +12,10 @@ Building and testing
 4. Te iste skripte se brišu sa: sudo make uninstall
 5. .ko fajl se nalazi u folderu obj
 6. Za učitavanje, uklanjanje ili "reload" modula mogu se koristiti, redom:
+
    sudo make ld
+   
    sudo make ud
+   
    sudo make rld
 
