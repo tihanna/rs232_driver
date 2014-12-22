@@ -1,1 +1,0 @@
-cmd_/tmp/rs232_driver/src/rs232_mod.ko := ld -r -m elf_x86_64 -T /usr/src/linux-headers-3.13.0-39-generic/scripts/module-common.lds --build-id  -o /tmp/rs232_driver/src/rs232_mod.ko /tmp/rs232_driver/src/rs232_mod.o /tmp/rs232_driver/src/rs232_mod.mod.o
