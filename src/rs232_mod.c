@@ -7,11 +7,8 @@
 
 static int device_open(struct inode *, struct file *);
 static int device_release(struct inode *, struct file *);
-static ssize_t device_read(struct file *, char *, size_t, loff_t *);
-static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
-
-struct resource *request_mem_region(unsigned long start, unsigned long len,
-                                    char *name);
+//static ssize_t device_read(struct file *, char *, size_t, loff_t *);
+//static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
 
 #define DEVICE_NAME "rs232_mod"
 #define SUCCESS 0
@@ -39,11 +36,11 @@ int init_module(void) {
 		return major;
 	}
 	//alokacija i mapiranje
-	request_mem_region(UART_BASE_ADDRRESS, 0x20, DEVICE_NAME);	
+	request_mem_region(UART_BASE_ADDRRESS, 0x20, DEVICE_NAME);
 	ioremap(UART_BASE_ADDRRESS, 0x20);
-	//podesavanje brzine	
+	//podesavanje brzine
 	iowrite8(BAUD_DIVISOR & 0xFF, UART_DLATCH_LO);
-	iowrite8(BAUD_DIVISOR << 8, UART_DLATCH_HI);
+	iowrite8(BAUD_DIVISOR >> 8, UART_DLATCH_HI);
 	return 0;
 }
 
