@@ -6,6 +6,9 @@
 #include "rs232_memory_map.h"
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/kfifo.h>
+#include <linux/device.h>
+#include <linux/kdev_t.h>
 
 static int device_open(struct inode *, struct file *);
 static int device_release(struct inode *, struct file *);
@@ -35,7 +38,10 @@ open: device_open,
 release: device_release
 };
 
+static struct class *rs232_device_class = 0;
+
 int init_module(void) {
+    dev_t devno;
     printk(KERN_INFO "Hello world\n");
 	major = register_chrdev(0, DEVICE_NAME, &fops);
     printk(KERN_INFO "Major is: %d\n", major);
@@ -45,6 +51,10 @@ int init_module(void) {
 
 		return major;
 	}
+
+    devno = MKDEV(major, 0);
+    rs232_device_class = class_create( THIS_MODULE, DEVICE_NAME );
+    device_create(rs232_device_class, NULL, devno, NULL, DEVICE_NAME);
 
     // create device node
 
@@ -76,13 +86,17 @@ int init_module(void) {
 
     iowrite8(65, UART_TX_DATA);
 
-    // create and setup timer
-
 	return 0;
 }
 
 void cleanup_module(void) {
+    dev_t devno;
 	printk(KERN_INFO "Goodbye world\n");
+    devno = MKDEV(major, 0);
+
+    device_destroy(rs232_device_class, devno);
+    class_unregister(rs232_device_class);
+
 	unregister_chrdev(major, DEVICE_NAME);
     free_irq(UART_IRQ, (void*)(irqh));
 }
