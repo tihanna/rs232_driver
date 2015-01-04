@@ -26,8 +26,8 @@ MODULE_LICENSE("GPL");
 
 static int major;
 static int Device_Open  =   0;
-static char msg[BUF_LEN];
-static char *msg_ptr;
+//static char msg[BUF_LEN];
+//static char *msg_ptr;
 int irq_resp;
 
 int fctrl = 0;
@@ -45,9 +45,7 @@ static struct class *rs232_device_class = 0;
 
 int init_module(void) {
     dev_t devno;
-    printk(KERN_INFO "Hello world\n");
 	major = register_chrdev(0, DEVICE_NAME, &fops);
-    printk(KERN_INFO "Major is: %d\n", major);
 
 	if (major < 0) {
 		printk(KERN_ALERT "Registering char device failed with %d\n", major);
@@ -90,7 +88,6 @@ int init_module(void) {
                                (void*)(irqh)
                            );
 
-    printk(KERN_INFO "request irq resp: %d\n", irq_resp);
 
     fctrl = ioread8(UART_FIFO_CTRL);
     iowrite8(fctrl | FIFO_ENABLE_BIT, UART_FIFO_CTRL);
@@ -103,7 +100,6 @@ int init_module(void) {
 
 void cleanup_module(void) {
     dev_t devno;
-	printk(KERN_INFO "Goodbye world\n");
     devno = MKDEV(major, 0);
 
     device_destroy(rs232_device_class, devno);
@@ -116,22 +112,13 @@ void cleanup_module(void) {
 }
 
 static int device_open(struct inode *inode, struct file *file) {
-	static int counter = 0;
-
 	if (Device_Open) {
 		return -EBUSY;
 	}
 
 	Device_Open++;
-	sprintf(msg, "I already told you %d times Hello world!\n", counter++);
-	msg_ptr = msg;
-	printk(KERN_INFO ":)))\n");
 	try_module_get(THIS_MODULE);
 
-    fctrl = ioread8(UART_INTR_ID);
-    printk(KERN_INFO "Interrupt ID: %x\n", fctrl);
-
-	printk(KERN_INFO "Nesto...\n");
 	return SUCCESS;
 }
 
