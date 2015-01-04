@@ -132,11 +132,17 @@ static int device_release(struct inode *inode, struct file *file) {
 
 static ssize_t device_read(struct file *f, char *c, size_t s, loff_t *off){
     char ch;
+    int count = 0;
+    int resp;
 
-    while( kfifo_out( &rx_fifo, &ch, sizeof(char)) )
+    while( (count < s) && kfifo_out( &rx_fifo, &ch, sizeof(char)) )
+    {
+        resp = copy_to_user(c+count, &ch, 1);
+        count++;
         printk(KERN_INFO "reading... %c\n", ch);
+    }
 
-    return 0;
+    return count;
 }
 
 static ssize_t device_write(struct file *f, const char *c, size_t s, loff_t *off){
