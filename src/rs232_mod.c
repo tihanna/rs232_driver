@@ -10,6 +10,7 @@
 #include <linux/device.h>
 #include <linux/kdev_t.h>
 
+// FOPS functions
 static int device_open(struct inode *, struct file *);
 static int device_release(struct inode *, struct file *);
 static ssize_t device_read(struct file *, char *, size_t, loff_t *);
@@ -38,6 +39,8 @@ open: device_open,
 release: device_release
 };
 
+struct kfifo rx_fifo;
+
 static struct class *rs232_device_class = 0;
 
 int init_module(void) {
@@ -52,15 +55,17 @@ int init_module(void) {
 		return major;
 	}
 
+    // Create device node
     devno = MKDEV(major, 0);
     rs232_device_class = class_create( THIS_MODULE, DEVICE_NAME );
     device_create(rs232_device_class, NULL, devno, NULL, DEVICE_NAME);
 
-    // create device node
 
+    // Remap IO region
 	request_mem_region(UART_BASE_ADDRRESS, 0x20, DEVICE_NAME);
 	ioremap(UART_BASE_ADDRRESS, 0x20);
 
+    // Init controller
     iowrite8(fctrl & LOOP_BIT, UART_MODEM_CTRL);
 
     iowrite8(DIVISOR_ACCESS_BIT, UART_LINE_CTRL);
@@ -72,6 +77,12 @@ int init_module(void) {
 
     iowrite8(0x01, UART_INTR_EN);
 
+
+    // Create kfifo
+    if( kfifo_alloc(&rx_fifo, 256, GFP_KERNEL) )
+        return -ENOMEM;
+
+    // Register IRQ
     irq_resp = request_irq(UART_IRQ,
                                (irq_handler_t)(irqh),
                                IRQF_SHARED | IRQF_TRIGGER_RISING,
@@ -84,6 +95,7 @@ int init_module(void) {
     fctrl = ioread8(UART_FIFO_CTRL);
     iowrite8(fctrl | FIFO_ENABLE_BIT, UART_FIFO_CTRL);
 
+    // Send some data
     iowrite8(65, UART_TX_DATA);
 
 	return 0;
@@ -99,6 +111,8 @@ void cleanup_module(void) {
 
 	unregister_chrdev(major, DEVICE_NAME);
     free_irq(UART_IRQ, (void*)(irqh));
+
+    kfifo_free(&rx_fifo);
 }
 
 static int device_open(struct inode *inode, struct file *file) {
@@ -129,29 +143,11 @@ static int device_release(struct inode *inode, struct file *file) {
 	return 0;
 }
 
-/*
-void timer_handler()
-{
-    // check fifo and buffer state
-    // read into the buffer
-    // anything to send?
-    // send it via uart
-}
-*/
-
 static ssize_t device_read(struct file *f, char *c, size_t s, loff_t *off){
-    // check your buffer
-    char buff[10];
-    int i;
+    char ch;
 
-    for(i = 0; i < 5; i++) {
-        buff[i] = ioread8(UART_RX_DATA);
-    }
-
-    buff[6] = 0;
-
-
-    printk(KERN_INFO "reading... %s\n", buff);
+    while( kfifo_out( &rx_fifo, &ch, sizeof(char)) )
+        printk(KERN_INFO "reading... %c\n", ch);
 
     return 0;
 }
@@ -168,7 +164,11 @@ static ssize_t device_write(struct file *f, const char *c, size_t s, loff_t *off
 
 irqreturn_t irqh(int irq, void *dev_id, struct pt_regs *regs)
 {
+    unsigned char input_char;
+    int res;
     printk(KERN_INFO "Interrupt happened\n");
-    ioread8(UART_RX_DATA);
+    input_char = ioread8(UART_RX_DATA);
+
+    res = kfifo_in(&rx_fifo, &input_char, 1);
     return IRQ_HANDLED;
 }
