@@ -9,6 +9,7 @@
 #include <linux/kfifo.h>
 #include <linux/device.h>
 #include <linux/kdev_t.h>
+#include <linux/sched.h>
 
 // FOPS functions
 static int device_open(struct inode *, struct file *);
@@ -26,8 +27,6 @@ MODULE_LICENSE("GPL");
 
 static int major;
 static int Device_Open  =   0;
-//static char msg[BUF_LEN];
-//static char *msg_ptr;
 int irq_resp;
 
 int fctrl = 0;
@@ -40,6 +39,7 @@ release: device_release
 };
 
 struct kfifo rx_fifo;
+wait_queue_head_t inq;
 
 static struct class *rs232_device_class = 0;
 
@@ -79,6 +79,9 @@ int init_module(void) {
     // Create kfifo
     if( kfifo_alloc(&rx_fifo, 256, GFP_KERNEL) )
         return -ENOMEM;
+
+    // Init event queue
+    init_waitqueue_head(&inq);
 
     // Register IRQ
     irq_resp = request_irq(UART_IRQ,
@@ -135,6 +138,7 @@ static ssize_t device_read(struct file *f, char *c, size_t s, loff_t *off){
     int count = 0;
     int resp;
 
+    resp = wait_event_interruptible( inq, kfifo_len( &rx_fifo) != 0 );
     while( (count < s) && kfifo_out( &rx_fifo, &ch, sizeof(char)) )
     {
         resp = copy_to_user(c+count, &ch, 1);
@@ -161,6 +165,8 @@ irqreturn_t irqh(int irq, void *dev_id, struct pt_regs *regs)
     int res;
     printk(KERN_INFO "Interrupt happened\n");
     input_char = ioread8(UART_RX_DATA);
+
+    wake_up_interruptible( &inq );
 
     res = kfifo_in(&rx_fifo, &input_char, 1);
     return IRQ_HANDLED;
