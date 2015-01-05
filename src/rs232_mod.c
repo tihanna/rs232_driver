@@ -17,6 +17,10 @@ static int device_release(struct inode *, struct file *);
 static ssize_t device_read(struct file *, char *, size_t, loff_t *);
 static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
 
+static void create_device_node(void);
+static void remap_io(void);
+static void init_controller(void);
+
 static irqreturn_t irqh(int, void*, struct pt_regs*);
 
 MODULE_LICENSE("GPL");
@@ -44,46 +48,22 @@ wait_queue_head_t inq;
 static struct class *rs232_device_class = 0;
 
 int init_module(void) {
-    dev_t devno;
 	major = register_chrdev(0, DEVICE_NAME, &fops);
 
 	if (major < 0) {
 		printk(KERN_ALERT "Registering char device failed with %d\n", major);
-
 		return major;
 	}
 
-    // Create device node
-    devno = MKDEV(major, 0);
-    rs232_device_class = class_create( THIS_MODULE, DEVICE_NAME );
-    device_create(rs232_device_class, NULL, devno, NULL, DEVICE_NAME);
+    create_device_node();
+    remap_io();
+    init_controller();
 
-
-    // Remap IO region
-	request_mem_region(UART_BASE_ADDRRESS, 0x20, DEVICE_NAME);
-	ioremap(UART_BASE_ADDRRESS, 0x20);
-
-    // Init controller
-    iowrite8(fctrl & LOOP_BIT, UART_MODEM_CTRL);
-
-    iowrite8(DIVISOR_ACCESS_BIT, UART_LINE_CTRL);
-
-    iowrite8(BAUD_DIVISOR, UART_DLATCH_LO);
-    iowrite8(BAUD_DIVISOR>>8, UART_DLATCH_HI);
-
-    iowrite8(WORD_LENGTH_8, UART_LINE_CTRL);
-
-    iowrite8(0x01, UART_INTR_EN);
-
-
-    // Create kfifo
     if( kfifo_alloc(&rx_fifo, 256, GFP_KERNEL) )
         return -ENOMEM;
 
-    // Init event queue
     init_waitqueue_head(&inq);
 
-    // Register IRQ
     irq_resp = request_irq(UART_IRQ,
                                (irq_handler_t)(irqh),
                                IRQF_SHARED | IRQF_TRIGGER_RISING,
@@ -94,9 +74,6 @@ int init_module(void) {
 
     fctrl = ioread8(UART_FIFO_CTRL);
     iowrite8(fctrl | FIFO_ENABLE_BIT, UART_FIFO_CTRL);
-
-    // Send some data
-    iowrite8(65, UART_TX_DATA);
 
 	return 0;
 }
@@ -170,4 +147,32 @@ irqreturn_t irqh(int irq, void *dev_id, struct pt_regs *regs)
 
     res = kfifo_in(&rx_fifo, &input_char, 1);
     return IRQ_HANDLED;
+}
+
+void create_device_node()
+{
+    dev_t devno;
+    devno = MKDEV(major, 0);
+    rs232_device_class = class_create( THIS_MODULE, DEVICE_NAME );
+    device_create(rs232_device_class, NULL, devno, NULL, DEVICE_NAME);
+}
+
+void remap_io()
+{
+	request_mem_region(UART_BASE_ADDRRESS, 0x20, DEVICE_NAME);
+	ioremap(UART_BASE_ADDRRESS, 0x20);
+}
+
+void init_controller()
+{
+    iowrite8(fctrl & LOOP_BIT, UART_MODEM_CTRL);
+
+    iowrite8(DIVISOR_ACCESS_BIT, UART_LINE_CTRL);
+
+    iowrite8(BAUD_DIVISOR, UART_DLATCH_LO);
+    iowrite8(BAUD_DIVISOR>>8, UART_DLATCH_HI);
+
+    iowrite8(WORD_LENGTH_8, UART_LINE_CTRL);
+
+    iowrite8(0x01, UART_INTR_EN);
 }
