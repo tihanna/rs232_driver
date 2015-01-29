@@ -3,7 +3,6 @@ obj-m := rs232_mod.o
 PWD := $(shell pwd)
 
 default:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
-	cp rs232_mod.ko ../obj
+	$(MAKE) -I $(KERNEL_DIR)/arch/arm/include/asm/ -C $(KERNEL_DIR) SUBDIRS=$(PWD) modules
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	$(MAKE) -C $(KERNEL_DIR) SUBDIRS=$(PWD) clean
